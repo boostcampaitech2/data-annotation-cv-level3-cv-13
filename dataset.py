@@ -1,7 +1,7 @@
 import os.path as osp
 import math
 import json
-from PIL import Image
+from PIL import Image, ImageOps
 
 import torch
 import numpy as np
@@ -334,9 +334,11 @@ def filter_vertices(vertices, labels, ignore_under=0, drop_under=0):
 
 
 class SceneTextDataset(Dataset):
-    def __init__(self, root_dir, split='train', image_size=1024, crop_size=512, color_jitter=True,
+    def __init__(self, root_dir, json_dir, split='train', image_size=1024, crop_size=512, color_jitter=True,
                  normalize=True):
-        with open(osp.join(root_dir, 'ufo/{}.json'.format(split)), 'r') as f:
+        # with open(osp.join(root_dir, 'ufo/{}.json'.format(split)), 'r') as f:
+        #     anno = json.load(f)
+        with open(osp.join(root_dir,json_dir), 'r') as f:
             anno = json.load(f)
 
         self.anno = anno
@@ -362,6 +364,7 @@ class SceneTextDataset(Dataset):
         vertices, labels = filter_vertices(vertices, labels, ignore_under=10, drop_under=1)
 
         image = Image.open(image_fpath)
+        image = ImageOps.exif_transpose(image)
         image, vertices = resize_img(image, vertices, self.image_size)
         image, vertices = adjust_height(image, vertices)
         image, vertices = rotate_img(image, vertices)
@@ -370,6 +373,7 @@ class SceneTextDataset(Dataset):
         if image.mode != 'RGB':
             image = image.convert('RGB')
         image = np.array(image)
+      #  np_images = image.copy() ## 
 
         funcs = []
         if self.color_jitter:
@@ -382,4 +386,4 @@ class SceneTextDataset(Dataset):
         word_bboxes = np.reshape(vertices, (-1, 4, 2))
         roi_mask = generate_roi_mask(image, vertices, labels)
 
-        return image, word_bboxes, roi_mask
+        return image, word_bboxes, roi_mask # , np_images ## 
