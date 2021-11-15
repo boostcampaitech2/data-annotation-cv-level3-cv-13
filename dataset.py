@@ -364,7 +364,8 @@ class SceneTextDataset(Dataset):
         vertices, labels = filter_vertices(vertices, labels, ignore_under=10, drop_under=1)
 
         image = Image.open(image_fpath)
-        image = ImageOps.exif_transpose(image)
+        image = ImageOps.exif_transpose(image) # If the image rotates automatically, it changes it to its original state.
+
         image, vertices = resize_img(image, vertices, self.image_size)
         image, vertices = adjust_height(image, vertices)
         image, vertices = rotate_img(image, vertices)

@@ -29,7 +29,7 @@ class EASTLoss(nn.Module):
 
     def forward(self, gt_score, pred_score, gt_geo, pred_geo, roi_mask):
         if torch.sum(gt_score) < 1:
-            return torch.sum(pred_score + pred_geo) * 0
+            return torch.sum(pred_score + pred_geo) * 0, dict(cls_loss=None, angle_loss=None, iou_loss=None)
 
         classify_loss = get_dice_loss(gt_score, pred_score * roi_mask)
         iou_loss_map, angle_loss_map = get_geo_loss(gt_geo, pred_geo)
