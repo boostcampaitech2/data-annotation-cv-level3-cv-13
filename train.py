@@ -33,12 +33,11 @@ def parse_args():
 
     # Conventional args
     parser.add_argument('--data_dir', type=str,
-                        default=os.environ.get('SM_CHANNEL_TRAIN', '/opt/ml/input/data/ICDAR17_OW'))
+                        default=os.environ.get('SM_CHANNEL_TRAIN', '../input/data/ICDAR17_Korean'))
     parser.add_argument('--json_dir', type=str,
-                        default='ICDAR17_train.json')
+                        default='ufo/train.json')
     parser.add_argument('--valid_json_dir', type=str,
-                        default='split_valid.json')
-
+                        default='ufo/train.json')
     parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR',
                                                                         'trained_models'))
 
@@ -51,7 +50,6 @@ def parse_args():
     parser.add_argument('--learning_rate', type=float, default=1e-3)
     parser.add_argument('--max_epoch', type=int, default=200)
     parser.add_argument('--save_interval', type=int, default=5)
-    parser.add_argument('--model_weights', type=str, default=None)
 
     args = parser.parse_args()
 
@@ -60,14 +58,18 @@ def parse_args():
 
     return args
 
-def do_validating(model, data_dir, valid_json_dir, batch_size,data_loader=None, num_batches=None, epoch=None,input_size = 1024):
+def do_validating(model, data_dir, valid_json_dir, batch_size, data_loader=None, num_batches=None, epoch=None,input_size = 1024):
     """
-    valid_num_batches, valid_loader, epoch 필요 loss 계산하려면
+    key값에서 Loss를 출력하냐 metric을 출력하냐에 따라 필요한 key값이 다른데 일단 다 넣어 주고 metric 출력은 주석 처리해줬습니다.
+    Loss의 경우 필요한 key 값은 model, data_loader, num_batches, epoch 
+    metric의 경우 필요한 model, data_dir, valid_json_dir, batch_size 입니다.
     """
 
     model.eval()
+    ###############
+    ## num1 LOSS ##
+    ###############
 
-    ## num1 LOSS 
     total_loss = 0
     epoch_start = time.time()
     with tqdm(total=num_batches) as pbar:
@@ -87,7 +89,11 @@ def do_validating(model, data_dir, valid_json_dir, batch_size,data_loader=None, 
     print('Validation Mean loss: {:.4f} | Elapsed time: {}'.format(
     total_loss / num_batches, timedelta(seconds=time.time() - epoch_start)))
 
-    ## NUM2 METRIC
+    return total_loss/num_batches, extra_info['cls_loss'], extra_info['angle_loss'], extra_info['iou_loss']
+
+    #################
+    ## NUM2 METRIC ##
+    #################
 
 #     with open(osp.join(data_dir,valid_json_dir), "r") as json_file:
 #         valid_json = json.load(json_file)
@@ -127,20 +133,18 @@ def do_validating(model, data_dir, valid_json_dir, batch_size,data_loader=None, 
     
 #     resDict = calc_deteval_metrics(pred_bboxes_dict, gt_bboxes_dict, transcriptions_dict, eval_hparams)
 #     print(f"precision: {resDict['total']['precision']}, recall: {resDict['total']['recall']}, f1-score(hmean): {resDict['total']['hmean']}")
-#    return pred_bboxes_dict #ufo_result
+#     return resDict['total']['precision'], resDict['total']['recall'], resDict['total']['hmean']
 
 
 def do_training(data_dir, json_dir, valid_json_dir, model_dir, device, image_size, input_size, num_workers, batch_size,
-                learning_rate, max_epoch, save_interval, model_weights):
+                learning_rate, max_epoch, save_interval):
     dataset = SceneTextDataset(data_dir, json_dir, split='train', image_size=image_size, crop_size=input_size)
     dataset = EASTDataset(dataset) # image, score_map, geo_map, roi_mask
-    ###############
+
     valid_dataset = SceneTextDataset(data_dir, valid_json_dir, split='train', image_size=image_size, crop_size=input_size)
     valid_dataset = EASTDataset(valid_dataset) # image, score_map, geo_map, roi_mask
     valid_num_batches = math.ceil(len(valid_dataset) / batch_size)
-    # with open(data_dir+'/'+valid_json_dir, "r") as json_file:
-    #     valid_json = json.load(json_file)
-    #############
+
     num_batches = math.ceil(len(dataset) / batch_size)
 
     train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
@@ -150,9 +154,6 @@ def do_training(data_dir, json_dir, valid_json_dir, model_dir, device, image_siz
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = EAST()
     model.to(device)
-
-    if model_weights:
-        model.load_state_dict(torch.load(model_weights))
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[max_epoch // 2], gamma=0.1)
@@ -184,7 +185,7 @@ def do_training(data_dir, json_dir, valid_json_dir, model_dir, device, image_siz
         print('Mean loss: {:.4f} | Elapsed time: {}'.format(
             epoch_loss / num_batches, timedelta(seconds=time.time() - epoch_start)))
         
-        do_validating(model, data_dir, valid_json_dir, batch_size, valid_loader, valid_num_batches, epoch)
+        val_mean_loss, val_cls_loss, val_angle_loss, val_iou_loss = do_validating(model, data_dir, valid_json_dir, batch_size, valid_loader, valid_num_batches, epoch)
 
         if (epoch + 1) % save_interval == 0:
             if not osp.exists(model_dir):
