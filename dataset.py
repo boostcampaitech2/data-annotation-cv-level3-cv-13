@@ -1,7 +1,7 @@
 import os.path as osp
 import math
 import json
-from PIL import Image
+from PIL import Image, ImageOps
 
 import torch
 import numpy as np
@@ -362,6 +362,7 @@ class SceneTextDataset(Dataset):
         vertices, labels = filter_vertices(vertices, labels, ignore_under=10, drop_under=1)
 
         image = Image.open(image_fpath)
+        image = ImageOps.exif_transpose(image) # If the image rotates automatically, it changes it to its original state.
         image, vertices = resize_img(image, vertices, self.image_size)
         image, vertices = adjust_height(image, vertices)
         image, vertices = rotate_img(image, vertices)
