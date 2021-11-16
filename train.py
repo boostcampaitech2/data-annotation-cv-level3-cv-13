@@ -19,9 +19,7 @@ from detect import detect
 from deteval import *
 import json
 import cv2
-
-
-
+import wandb
 
 
 def parse_args():
@@ -134,13 +132,14 @@ def do_validating(model, data_dir, valid_json_dir, batch_size, data_loader=None,
 
 def do_training(data_dir, json_dir, valid_json_dir, model_dir, device, image_size, input_size, num_workers, batch_size,
                 learning_rate, max_epoch, save_interval):
+
     dataset = SceneTextDataset(data_dir, json_dir, split='train', image_size=image_size, crop_size=input_size)
-    dataset = EASTDataset(dataset) # image, score_map, geo_map, roi_mask
+    dataset = EASTDataset(dataset) 
 
     valid_dataset = SceneTextDataset(data_dir, valid_json_dir, split='train', image_size=image_size, crop_size=input_size)
-    valid_dataset = EASTDataset(valid_dataset) # image, score_map, geo_map, roi_mask
+    valid_dataset = EASTDataset(valid_dataset) 
+    
     valid_num_batches = math.ceil(len(valid_dataset) / batch_size)
-
     num_batches = math.ceil(len(dataset) / batch_size)
 
     train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
@@ -153,6 +152,8 @@ def do_training(data_dir, json_dir, valid_json_dir, model_dir, device, image_siz
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[max_epoch // 2], gamma=0.1)
+    
+    wandb.watch(model)
 
     model.train()
     for epoch in range(max_epoch):
@@ -175,6 +176,7 @@ def do_training(data_dir, json_dir, valid_json_dir, model_dir, device, image_siz
                     'IoU loss': extra_info['iou_loss']
                 }
                 pbar.set_postfix(val_dict)
+                wandb.log(val_dict)
 
         scheduler.step()
 
@@ -182,6 +184,10 @@ def do_training(data_dir, json_dir, valid_json_dir, model_dir, device, image_siz
             epoch_loss / num_batches, timedelta(seconds=time.time() - epoch_start)))
         
         val_mean_loss, val_cls_loss, val_angle_loss, val_iou_loss = do_validating(model, data_dir, valid_json_dir, batch_size, valid_loader, valid_num_batches, epoch)
+
+        wandb.log(
+            {"Epoch Mean loss": epoch_loss / num_batches}
+        )
 
         if (epoch + 1) % save_interval == 0:
             if not osp.exists(model_dir):
@@ -192,7 +198,10 @@ def do_training(data_dir, json_dir, valid_json_dir, model_dir, device, image_siz
 
 
 def main(args):
+    wandb.init(project="ocr", name="ocr_test2")
+    wandb.config.update(args)
     do_training(**args.__dict__)
+    wandb.run.finish()
 
 
 if __name__ == '__main__':
