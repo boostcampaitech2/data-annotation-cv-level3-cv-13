@@ -15,6 +15,7 @@ from east_dataset import EASTDataset
 from dataset import SceneTextDataset
 from model import EAST
 
+import wandb
 
 def parse_args():
     parser = ArgumentParser()
@@ -46,7 +47,7 @@ def parse_args():
 def do_training(data_dir, model_dir, device, image_size, input_size, num_workers, batch_size,
                 learning_rate, max_epoch, save_interval):
     dataset = SceneTextDataset(data_dir, split='train', image_size=image_size, crop_size=input_size)
-    dataset = EASTDataset(dataset)
+    dataset = EASTDataset(dataset) # SceneTextDataset으로 불러온 후 EASTDataset으로 바꿔줌.
     num_batches = math.ceil(len(dataset) / batch_size)
     train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
@@ -55,6 +56,8 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[max_epoch // 2], gamma=0.1)
+    
+    wandb.watch(model)
 
     model.train()
     for epoch in range(max_epoch):
@@ -77,11 +80,16 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
                     'IoU loss': extra_info['iou_loss']
                 }
                 pbar.set_postfix(val_dict)
+                wandb.log(val_dict)
 
         scheduler.step()
 
         print('Mean loss: {:.4f} | Elapsed time: {}'.format(
             epoch_loss / num_batches, timedelta(seconds=time.time() - epoch_start)))
+
+        wandb.log(
+            {"Epoch Mean loss": epoch_loss / num_batches}
+        )
 
         if (epoch + 1) % save_interval == 0:
             if not osp.exists(model_dir):
@@ -92,7 +100,10 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
 
 
 def main(args):
+    wandb.init(project="ocr", name="ocr_test2")
+    wandb.config.update(args)
     do_training(**args.__dict__)
+    wandb.run.finish()
 
 
 if __name__ == '__main__':
