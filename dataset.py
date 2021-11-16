@@ -362,9 +362,11 @@ def split_polygon_to_quadril(word_info):
 
 
 class SceneTextDataset(Dataset):
-    def __init__(self, root_dir, split='train', image_size=1024, crop_size=512, color_jitter=True,
+    def __init__(self, root_dir, json_dir, split='train', image_size=1024, crop_size=512, color_jitter=True,
                  normalize=True):
-        with open(osp.join(root_dir, 'ufo/{}.json'.format(split)), 'r') as f:
+        # with open(osp.join(root_dir, 'ufo/{}.json'.format(split)), 'r') as f:
+        #     anno = json.load(f)
+        with open(osp.join(root_dir,json_dir), 'r') as f:
             anno = json.load(f)
 
         self.anno = anno
@@ -393,6 +395,7 @@ class SceneTextDataset(Dataset):
 
         image = Image.open(image_fpath)
         image = ImageOps.exif_transpose(image) # If the image rotates automatically, it changes it to its original state.
+
         image, vertices = resize_img(image, vertices, self.image_size)
         image, vertices = adjust_height(image, vertices)
         image, vertices = rotate_img(image, vertices)

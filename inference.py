@@ -12,7 +12,6 @@ from tqdm import tqdm
 
 from detect import detect
 
-
 CHECKPOINT_EXTENSIONS = ['.pth', '.ckpt']
 
 
@@ -38,26 +37,26 @@ def parse_args():
 
 def do_inference(model, ckpt_fpath, data_dir, input_size, batch_size, split='public'):
     model.load_state_dict(torch.load(ckpt_fpath, map_location='cpu'))
-    model.eval()
+    model.eval() # 모델 평가
 
-    image_fnames, by_sample_bboxes = [], []
+    image_fnames, by_sample_bboxes = [], [] 
 
     images = []
     for image_fpath in tqdm(glob(osp.join(data_dir, '{}/*'.format(split)))):
-        image_fnames.append(osp.basename(image_fpath))
+        image_fnames.append(osp.basename(image_fpath)) 
 
-        images.append(cv2.imread(image_fpath)[:, :, ::-1])
-        if len(images) == batch_size:
-            by_sample_bboxes.extend(detect(model, images, input_size))
-            images = []
-
+        images.append(cv2.imread(image_fpath)[:, :, ::-1]) 
+        if len(images) == batch_size:           
+            by_sample_bboxes.extend(detect(model, images, input_size)) 
+            images = [] 
+            
     if len(images):
         by_sample_bboxes.extend(detect(model, images, input_size))
 
-    ufo_result = dict(images=dict())
+    ufo_result = dict(images=dict()) 
     for image_fname, bboxes in zip(image_fnames, by_sample_bboxes):
         words_info = {idx: dict(points=bbox.tolist()) for idx, bbox in enumerate(bboxes)}
-        ufo_result['images'][image_fname] = dict(words=words_info)
+        ufo_result['images'][image_fname] = dict(words=words_info) 
 
     return ufo_result
 
