@@ -22,6 +22,8 @@ if __name__=="__main__":
                         help='language you want to remove',default=[]) # ex) --rm_lan Arabic Symbols Chinese Bangla Japanese Mixed 
     parser.add_argument('--json_dir', type = str, 
                         help='Path where json file is saved',default="/opt/ml/input/data/ICDAR17_OW")
+    parser.add_argument('--valid_json_dir', type = str, 
+                    help='it is used for eliminating validation image in ICDAR17 json',default=None)
 
     args = parser.parse_args() 
 
@@ -84,7 +86,15 @@ if __name__=="__main__":
                 rm_img_list.append(img_name)
         for k in rm_img_list:
             icdar_json['images'].pop(k, None)
-        print(f"제거되고 남은 이미지수: {len(icdar_json['images']):,}")   
+        print(f"제거되고 남은 이미지수: {len(icdar_json['images']):,}")
+      
+    
+    if args.valid_json_dir:
+        with open(args.valid_json_dir, "r") as json_file:
+            validation_json = json.load(json_file)
+        for k in validation_json['images'].keys():
+            icdar_json['images'].pop(k, None)
+        print(f"Validation image가 제거되고 남은 이미지수: {len(icdar_json['images']):,}") 
 
     with open(osp.join(args.json_dir, 'icdar17.json'), 'w') as fp:
         json.dump(icdar_json, fp)
