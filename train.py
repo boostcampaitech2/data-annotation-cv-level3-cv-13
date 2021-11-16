@@ -15,15 +15,11 @@ from east_dataset import EASTDataset
 from dataset import SceneTextDataset
 from model import EAST
 
-###########
 from detect import detect
-import pdb
+from deteval import *
 import json
 import cv2
-# import albumentations as A
-# from albumentations.pytorch import ToTensorV2
-# from albumentations.augmentations.geometric.resize import LongestMaxSize
-from deteval import *
+
 
 
 
