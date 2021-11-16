@@ -2,14 +2,15 @@ import os.path as osp
 import math
 import json
 from PIL import Image, ImageOps
+from imageio import imread
 
-import torch
 import numpy as np
 import cv2
 import albumentations as A
 from torch.utils.data import Dataset
 from shapely.geometry import Polygon
 
+from augmentation import *
 
 def cal_distance(x1, y1, x2, y2):
     '''calculate the Euclidean distance'''
@@ -380,6 +381,45 @@ class SceneTextDataset(Dataset):
         transform = A.Compose(funcs)
 
         image = transform(image=image)['image']
+        word_bboxes = np.reshape(vertices, (-1, 4, 2))
+        roi_mask = generate_roi_mask(image, vertices, labels)
+
+        return image, word_bboxes, roi_mask
+
+
+class TransformedSceneTextDataset(Dataset):
+    def __init__(self, root_dir, split='train', transform=None):
+        with open(osp.join(root_dir, 'ufo/{}.json'.format(split)), 'r') as f:
+            anno = json.load(f)
+
+        self.anno = anno
+        self.image_fnames = sorted(anno['images'].keys())
+        self.image_dir = osp.join(root_dir, 'images')
+
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.image_fnames)
+
+    def __getitem__(self, idx):
+        image_fname = self.image_fnames[idx]
+        image_fpath = osp.join(self.image_dir, image_fname)
+
+        vertices, labels = [], []
+        for word_info in self.anno['images'][image_fname]['words'].values():
+            vertices.append(np.array(word_info['points']))
+            labels.append(int(not word_info['illegibility']))
+        vertices, labels = np.array(vertices, dtype=np.float32), np.array(labels, dtype=np.int64)
+
+        image = imread(image_fpath, pilmode='RGB')
+        if self.transform != None:
+            if isinstance(self.transform, ComposedTransformation):
+                transformed = self.transform(image=image, word_bboxes=vertices)
+                image = transformed['image']
+                vertices = transformed['word_bboxes']
+            else:
+                pass
+
         word_bboxes = np.reshape(vertices, (-1, 4, 2))
         roi_mask = generate_roi_mask(image, vertices, labels)
 
