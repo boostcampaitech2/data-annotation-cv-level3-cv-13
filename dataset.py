@@ -374,7 +374,6 @@ class SceneTextDataset(Dataset):
         if image.mode != 'RGB':
             image = image.convert('RGB')
         image = np.array(image)
-      #  np_images = image.copy() ## 
 
         funcs = []
         if self.color_jitter:
@@ -387,4 +386,4 @@ class SceneTextDataset(Dataset):
         word_bboxes = np.reshape(vertices, (-1, 4, 2))
         roi_mask = generate_roi_mask(image, vertices, labels)
 
-        return image, word_bboxes, roi_mask # , np_images ## 
+        return image, word_bboxes, roi_mask
