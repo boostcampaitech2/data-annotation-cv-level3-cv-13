@@ -11,7 +11,6 @@ from model import EAST
 from tqdm import tqdm
 
 from detect import detect
-import pdb
 
 CHECKPOINT_EXTENSIONS = ['.pth', '.ckpt']
 
