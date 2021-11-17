@@ -361,6 +361,19 @@ def split_polygon_to_quadril(word_info):
     return result
 
 
+def set_target_size(img, vertices, size):
+    h, w = img.height, img.width
+    target_h, target_w = size, size
+    img = img.resize((target_w, target_h), Image.BILINEAR)
+    ratio_w = target_w / w
+    ratio_h = target_h / h
+    new_vertices = np.zeros(vertices.shape)
+    if vertices.size > 0:
+        new_vertices[:,[0,2,4,6]] = vertices[:,[0,2,4,6]] * ratio_w
+        new_vertices[:,[1,3,5,7]] = vertices[:,[1,3,5,7]] * ratio_h
+    return img, new_vertices
+
+    
 class SceneTextDataset(Dataset):
     def __init__(self, root_dir, json_dir, split='train', image_size=1024, crop_size=512, color_jitter=True,
                  normalize=True):
@@ -452,6 +465,80 @@ class TransformedSceneTextDataset(Dataset):
             else:
                 pass
 
+        word_bboxes = np.reshape(vertices, (-1, 4, 2))
+        roi_mask = generate_roi_mask(image, vertices, labels)
+
+        return image, word_bboxes, roi_mask
+
+
+class PolygonDatasetExceptCrop(Dataset):
+    '''
+    기존 SceneTextDatset에서 crop 대신 resize를 수행합니다.
+
+    Args:
+        root_dir (str): json파일과 이미지파일의 상위 디렉토리
+        split (str): json파일명
+        image_size (int): 이미지 resize시 평균 크기
+        target_size (int): 이미지 최종 크기
+        color_jitter (bool): color_jitter 적용 유무
+        normalize (bool): normalize 적용 유무
+
+    Attributes:
+        anno (dict): json파일 load 내용
+        image_fnames (list): 이미지 파일명 리스트 
+        image_dir (str): 이미지 폴더 경로
+        image_size (int): 이미지 resize시 평균 크기
+        target_size (int): 이미지 최종 크기
+        color_jitter (bool): color_jitter 적용 유무
+        normalize (bool): normalize 적용 유무
+    '''
+    def __init__(self, root_dir, split='train', image_size=1024, target_size=1024, color_jitter=True,
+                 normalize=True):
+        with open(osp.join(root_dir, '{}.json'.format(split)), 'r') as f:
+            anno = json.load(f)
+
+        self.anno = anno
+        self.image_fnames = sorted(anno['images'].keys())
+        self.image_dir = root_dir
+
+        self.image_size, self.target_size = image_size, target_size
+        self.color_jitter, self.normalize = color_jitter, normalize
+
+    def __len__(self):
+        return len(self.image_fnames)
+
+    def __getitem__(self, idx):
+        image_fname = self.image_fnames[idx]
+        image_fpath = osp.join(self.image_dir, image_fname)
+
+        vertices, labels = [], []
+        for word_info in self.anno['images'][image_fname]['words'].values():
+            tmp = split_polygon_to_quadril(word_info)
+            vertices.extend(tmp)
+            labels.extend([int(not word_info['illegibility'])] * len(tmp))
+        vertices, labels = np.array(vertices, dtype=np.float32), np.array(labels, dtype=np.int64)
+
+        vertices, labels = filter_vertices(vertices, labels, ignore_under=10, drop_under=1)
+
+        image = Image.open(image_fpath)
+        image = ImageOps.exif_transpose(image) # If the image rotates automatically, it changes it to its original state.
+        image, vertices = resize_img(image, vertices, self.image_size)
+        image, vertices = adjust_height(image, vertices)
+        image, vertices = rotate_img(image, vertices)
+        image, vertices = set_target_size(image, vertices, self.target_size)
+
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        image = np.array(image)
+
+        funcs = []
+        if self.color_jitter:
+            funcs.append(A.ColorJitter(0.5, 0.5, 0.5, 0.25))
+        if self.normalize:
+            funcs.append(A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)))
+        transform = A.Compose(funcs)
+
+        image = transform(image=image)['image']
         word_bboxes = np.reshape(vertices, (-1, 4, 2))
         roi_mask = generate_roi_mask(image, vertices, labels)
 
