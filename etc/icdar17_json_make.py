@@ -67,7 +67,7 @@ if __name__=="__main__":
 
     # ICDAR 이미지에 jpg가 아닌 gif, png로 저장된 이미지를 jpg로 형 변환
     # 이미지 처리하고 싶지 않다면 주석처리 해주세요 ~
-    for img_format in ["*.gif", "*png"]:
+    for img_format in ["*.gif", "*.png"]:
         for img_file in glob.glob(osp.join(args.img_file_path, img_format)):
             img = Image.open(img_file)
             img = ImageOps.exif_transpose(img)
