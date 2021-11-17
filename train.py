@@ -74,7 +74,7 @@ def parse_args():
     parser.add_argument('--save_interval', type=int, default=5)
     parser.add_argument('--use_poly', type=bool, default=False)
     parser.add_argument('--use_val', type=bool, default=False)
-    parser.add_argument('--use_fp16', type=bool, default=True)
+    parser.add_argument('--use_fp16', type=bool, default=False)
 
     args = parser.parse_args()
 
@@ -204,7 +204,7 @@ def do_training(seed,data_dir, json_dir, model_dir, dataset_type, device, image_
     model = EAST()
     model.to(device)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[max_epoch // 2], gamma=0.1)
     
     wandb.watch(model)
@@ -264,7 +264,7 @@ def do_training(seed,data_dir, json_dir, model_dir, dataset_type, device, image_
 
 
 def main(args):
-    wandb.init(project="ocr", name="quad_lr_0.007")
+    wandb.init(project="ocr", name="quad_polygon_data_refined")
     wandb.config.update(args)
     do_training(**args.__dict__)
     wandb.run.finish()
