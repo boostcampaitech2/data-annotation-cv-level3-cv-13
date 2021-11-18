@@ -76,6 +76,9 @@ def parse_args():
     parser.add_argument('--use_val', type=bool, default=False)
     parser.add_argument('--use_fp16', type=bool, default=False)
 
+    parser.add_argument('--pretrain_last', type=bool, default=False)
+    parser.add_argument('--pretrained_last_dir', type=str, default='/opt/ml/code/trained_models/latest.pth')
+
     args = parser.parse_args()
 
     if args.input_size % 32 != 0:
@@ -161,8 +164,9 @@ def do_validating(model, data_dir, valid_json_dir, batch_size, data_loader=None,
 #     return resDict['total']['precision'], resDict['total']['recall'], resDict['total']['hmean']
 
 
+
 def do_training(seed,data_dir, json_dir, model_dir, dataset_type, device, image_size, input_size, num_workers, batch_size,
-                learning_rate, max_epoch, save_interval, use_poly=True, use_val=False, valid_json_dir=None, use_fp16=False):
+                learning_rate, max_epoch, save_interval, pretrain_last, pretrained_last_dir, use_poly=True, use_val=False, valid_json_dir=None, use_fp16=False):
 
 
     # code for a reproducibility
@@ -201,7 +205,13 @@ def do_training(seed,data_dir, json_dir, model_dir, dataset_type, device, image_
 
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = EAST()
+    
+    if not pretrain_last: # 이미지넷 기학습 가중치를 불러오는 경우
+        model = EAST()
+    else: # 직접 학습시킨 결과물의 가중치를 불러오는 경우
+        model = EAST(pretrained=False)
+        model.load_state_dict(torch.load(pretrained_last_dir))
+    
     model.to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
