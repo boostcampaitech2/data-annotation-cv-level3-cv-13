@@ -45,6 +45,9 @@ def parse_args():
     parser.add_argument('--max_epoch', type=int, default=200)
     parser.add_argument('--save_interval', type=int, default=5)
 
+    parser.add_argument('--pretrain_last', type=bool, default=False)
+    parser.add_argument('--pretrained_last_dir', type=str, default='/opt/ml/code/trained_models/latest.pth')
+
     args = parser.parse_args()
 
     if args.input_size % 32 != 0:
@@ -131,7 +134,7 @@ def do_validating(model, data_dir, valid_json_dir, batch_size, data_loader=None,
 
 
 def do_training(data_dir, json_dir, valid_json_dir, model_dir, device, image_size, input_size, num_workers, batch_size,
-                learning_rate, max_epoch, save_interval):
+                learning_rate, max_epoch, save_interval, pretrain_last, pretrained_last_dir):
 
     dataset = SceneTextDataset(data_dir, json_dir, split='train', image_size=image_size, crop_size=input_size)
     dataset = EASTDataset(dataset) 
@@ -147,7 +150,13 @@ def do_training(data_dir, json_dir, valid_json_dir, model_dir, device, image_siz
 
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = EAST()
+    
+    if not pretrain_last: # 이미지넷 기학습 가중치를 불러오는 경우
+        model = EAST()
+    else: # 직접 학습시킨 결과물의 가중치를 불러오는 경우
+        model = EAST(pretrained=False)
+        model.load_state_dict(torch.load(pretrained_last_dir))
+    
     model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
