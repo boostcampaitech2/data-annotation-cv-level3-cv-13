@@ -12,6 +12,7 @@ from shapely.geometry import Polygon
 
 from augmentation import *
 
+
 def cal_distance(x1, y1, x2, y2):
     '''calculate the Euclidean distance'''
     return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
@@ -39,7 +40,8 @@ def move_points(vertices, index1, index2, r, coef):
     r2 = r[index2]
     length_x = vertices[x1_index] - vertices[x2_index]
     length_y = vertices[y1_index] - vertices[y2_index]
-    length = cal_distance(vertices[x1_index], vertices[y1_index], vertices[x2_index], vertices[y2_index])
+    length = cal_distance(
+        vertices[x1_index], vertices[y1_index], vertices[x2_index], vertices[y2_index])
     if length > 1:
         ratio = (r1 * coef) / length
         vertices[x1_index] += ratio * (-length_x)
@@ -59,18 +61,18 @@ def shrink_poly(vertices, coef=0.3):
         v       : vertices of shrinked text region <numpy.ndarray, (8,)>
     '''
     x1, y1, x2, y2, x3, y3, x4, y4 = vertices
-    r1 = min(cal_distance(x1,y1,x2,y2), cal_distance(x1,y1,x4,y4))
-    r2 = min(cal_distance(x2,y2,x1,y1), cal_distance(x2,y2,x3,y3))
-    r3 = min(cal_distance(x3,y3,x2,y2), cal_distance(x3,y3,x4,y4))
-    r4 = min(cal_distance(x4,y4,x1,y1), cal_distance(x4,y4,x3,y3))
+    r1 = min(cal_distance(x1, y1, x2, y2), cal_distance(x1, y1, x4, y4))
+    r2 = min(cal_distance(x2, y2, x1, y1), cal_distance(x2, y2, x3, y3))
+    r3 = min(cal_distance(x3, y3, x2, y2), cal_distance(x3, y3, x4, y4))
+    r4 = min(cal_distance(x4, y4, x1, y1), cal_distance(x4, y4, x3, y3))
     r = [r1, r2, r3, r4]
 
     # obtain offset to perform move_points() automatically
-    if cal_distance(x1,y1,x2,y2) + cal_distance(x3,y3,x4,y4) > \
-       cal_distance(x2,y2,x3,y3) + cal_distance(x1,y1,x4,y4):
-        offset = 0 # two longer edges are (x1y1-x2y2) & (x3y3-x4y4)
+    if cal_distance(x1, y1, x2, y2) + cal_distance(x3, y3, x4, y4) > \
+       cal_distance(x2, y2, x3, y3) + cal_distance(x1, y1, x4, y4):
+        offset = 0  # two longer edges are (x1y1-x2y2) & (x3y3-x4y4)
     else:
-        offset = 1 # two longer edges are (x2y2-x3y3) & (x4y4-x1y1)
+        offset = 1  # two longer edges are (x2y2-x3y3) & (x4y4-x1y1)
 
     v = vertices.copy()
     v = move_points(v, 0 + offset, 1 + offset, r, coef)
@@ -94,9 +96,9 @@ def rotate_vertices(vertices, theta, anchor=None):
     Output:
         rotated vertices <numpy.ndarray, (8,)>
     '''
-    v = vertices.reshape((4,2)).T
+    v = vertices.reshape((4, 2)).T
     if anchor is None:
-        anchor = v[:,:1]
+        anchor = v[:, :1]
     rotate_mat = get_rotate_mat(theta)
     res = np.dot(rotate_mat, v - anchor)
     return (res + anchor).T.reshape(-1)
@@ -128,7 +130,7 @@ def cal_error(vertices):
     x_min, x_max, y_min, y_max = get_boundary(vertices)
     x1, y1, x2, y2, x3, y3, x4, y4 = vertices
     err = cal_distance(x1, y1, x_min, y_min) + cal_distance(x2, y2, x_max, y_min) + \
-          cal_distance(x3, y3, x_max, y_max) + cal_distance(x4, y4, x_min, y_max)
+        cal_distance(x3, y3, x_max, y_max) + cal_distance(x4, y4, x_min, y_max)
     return err
 
 
@@ -149,7 +151,8 @@ def find_min_rect_angle(vertices):
                     (max(y1, y2, y3, y4) - min(y1, y2, y3, y4))
         area_list.append(temp_area)
 
-    sorted_area_index = sorted(list(range(len(area_list))), key=lambda k: area_list[k])
+    sorted_area_index = sorted(
+        list(range(len(area_list))), key=lambda k: area_list[k])
     min_error = float('inf')
     best_index = -1
     rank_num = 10
@@ -209,8 +212,8 @@ def crop_img(img, vertices, labels, length):
 
     new_vertices = np.zeros(vertices.shape)
     if vertices.size > 0:
-        new_vertices[:,[0,2,4,6]] = vertices[:,[0,2,4,6]] * ratio_w
-        new_vertices[:,[1,3,5,7]] = vertices[:,[1,3,5,7]] * ratio_h
+        new_vertices[:, [0, 2, 4, 6]] = vertices[:, [0, 2, 4, 6]] * ratio_w
+        new_vertices[:, [1, 3, 5, 7]] = vertices[:, [1, 3, 5, 7]] * ratio_h
 
     # find random position
     remain_h = img.height - length
@@ -221,14 +224,15 @@ def crop_img(img, vertices, labels, length):
         cnt += 1
         start_w = int(np.random.rand() * remain_w)
         start_h = int(np.random.rand() * remain_h)
-        flag = is_cross_text([start_w, start_h], length, new_vertices[labels==1,:])
+        flag = is_cross_text([start_w, start_h], length,
+                             new_vertices[labels == 1, :])
     box = (start_w, start_h, start_w + length, start_h + length)
     region = img.crop(box)
     if new_vertices.size == 0:
         return region, new_vertices
 
-    new_vertices[:,[0,2,4,6]] -= start_w
-    new_vertices[:,[1,3,5,7]] -= start_h
+    new_vertices[:, [0, 2, 4, 6]] -= start_w
+    new_vertices[:, [1, 3, 5, 7]] -= start_h
     return region, new_vertices
 
 
@@ -250,7 +254,7 @@ def rotate_all_pixels(rotate_mat, anchor_x, anchor_y, length):
     y_lin = y.reshape((1, x.size))
     coord_mat = np.concatenate((x_lin, y_lin), 0)
     rotated_coord = np.dot(rotate_mat, coord_mat - np.array([[anchor_x], [anchor_y]])) + \
-                                                   np.array([[anchor_x], [anchor_y]])
+        np.array([[anchor_x], [anchor_y]])
     rotated_x = rotated_coord[0, :].reshape(x.shape)
     rotated_y = rotated_coord[1, :].reshape(y.shape)
     return rotated_x, rotated_y
@@ -284,7 +288,8 @@ def adjust_height(img, vertices, ratio=0.2):
 
     new_vertices = vertices.copy()
     if vertices.size > 0:
-        new_vertices[:,[1,3,5,7]] = vertices[:,[1,3,5,7]] * (new_h / old_h)
+        new_vertices[:, [1, 3, 5, 7]] = vertices[:,
+                                                 [1, 3, 5, 7]] * (new_h / old_h)
     return img, new_vertices
 
 
@@ -304,7 +309,8 @@ def rotate_img(img, vertices, angle_range=10):
     img = img.rotate(angle, Image.BILINEAR)
     new_vertices = np.zeros(vertices.shape)
     for i, vertice in enumerate(vertices):
-        new_vertices[i,:] = rotate_vertices(vertice, -angle / 180 * math.pi, np.array([[center_x],[center_y]]))
+        new_vertices[i, :] = rotate_vertices(
+            vertice, -angle / 180 * math.pi, np.array([[center_x], [center_y]]))
     return img, new_vertices
 
 
@@ -316,7 +322,8 @@ def generate_roi_mask(image, vertices, labels):
     ignored_polys = []
     for vertice, label in zip(vertices, labels):
         if label == 0:
-            ignored_polys.append(np.around(vertice.reshape((4, 2))).astype(np.int32))
+            ignored_polys.append(
+                np.around(vertice.reshape((4, 2))).astype(np.int32))
     cv2.fillPoly(mask, ignored_polys, 0)
     return mask
 
@@ -327,7 +334,8 @@ def filter_vertices(vertices, labels, ignore_under=0, drop_under=0):
 
     new_vertices, new_labels = vertices.copy(), labels.copy()
 
-    areas = np.array([Polygon(v.reshape((4, 2))).convex_hull.area for v in vertices])
+    areas = np.array(
+        [Polygon(v.reshape((4, 2))).convex_hull.area for v in vertices])
     labels[areas < ignore_under] = 0
 
     if drop_under > 0:
@@ -363,6 +371,7 @@ def split_polygon_to_quadril(word_info):
 
     return result
 
+
 def transform_to_quad(points):
     """
     - Args
@@ -374,7 +383,7 @@ def transform_to_quad(points):
 
     x1, y1 = min(upside[::2]), min(upside[1::2])
     x2, y2 = max(upside[::2]), min(upside[1::2])
-    x3, y3 = max(downside[::2]), max(downside[1::2]) 
+    x3, y3 = max(downside[::2]), max(downside[1::2])
     x4, y4 = min(downside[::2]), max(downside[1::2])
 
     return np.array([x1, y1, x2, y2, x3, y3, x4, y4])
@@ -388,14 +397,14 @@ def set_target_size(img, vertices, size):
     ratio_h = target_h / h
     new_vertices = np.zeros(vertices.shape)
     if vertices.size > 0:
-        new_vertices[:,[0,2,4,6]] = vertices[:,[0,2,4,6]] * ratio_w
-        new_vertices[:,[1,3,5,7]] = vertices[:,[1,3,5,7]] * ratio_h
+        new_vertices[:, [0, 2, 4, 6]] = vertices[:, [0, 2, 4, 6]] * ratio_w
+        new_vertices[:, [1, 3, 5, 7]] = vertices[:, [1, 3, 5, 7]] * ratio_h
     return img, new_vertices
 
-    
+
 class SceneTextDataset(Dataset):
     def __init__(self, root_dir, split='train', image_size=1024, target_size=512, color_jitter=True,
-                 normalize=True, use_poly = True):
+                 normalize=True, use_poly=True):
         with open(osp.join(root_dir, 'ufo/{}.json'.format(split)), 'r') as f:
             anno = json.load(f)
 
@@ -414,7 +423,7 @@ class SceneTextDataset(Dataset):
         image_fpath = osp.join(self.image_dir, image_fname)
 
         vertices, labels = [], []
-        
+
         for word_info in self.anno['images'][image_fname]['words'].values():
             if self.use_poly:
                 tmp = split_polygon_to_quadril(word_info)
@@ -428,14 +437,19 @@ class SceneTextDataset(Dataset):
                 elif len(flattened_vertices) < 8:
                     # annotation information이 완전하지 않을 경우 버린다.
                     continue
-                vertices.append(flattened_vertices) # flatten을 해주면 4,2 -> 4*2
-                labels.append(int(not word_info['illegibility'])) # 유의하면 1 아니면 0
-        
-        vertices, labels = np.array(vertices, dtype=np.float32), np.array(labels, dtype=np.int64) # 이 부분에서 무조건 inhomogeneous shape error가 날 수밖에 없음. 애초에 np array는 이걸 안받아.
-        vertices, labels = filter_vertices(vertices, labels, ignore_under=10, drop_under=1)
+                vertices.append(flattened_vertices)  # flatten을 해주면 4,2 -> 4*2
+                # 유의하면 1 아니면 0
+                labels.append(int(not word_info['illegibility']))
+
+        # 이 부분에서 무조건 inhomogeneous shape error가 날 수밖에 없음. 애초에 np array는 이걸 안받아.
+        vertices, labels = np.array(
+            vertices, dtype=np.float32), np.array(labels, dtype=np.int64)
+        vertices, labels = filter_vertices(
+            vertices, labels, ignore_under=10, drop_under=1)
 
         image = Image.open(image_fpath)
-        image = ImageOps.exif_transpose(image) # If the image rotates automatically, it changes it to its original state.
+        # If the image rotates automatically, it changes it to its original state.
+        image = ImageOps.exif_transpose(image)
 
         image, vertices = resize_img(image, vertices, self.image_size)
         image, vertices = adjust_height(image, vertices)
@@ -450,7 +464,8 @@ class SceneTextDataset(Dataset):
         if self.color_jitter:
             funcs.append(A.ColorJitter(0.5, 0.5, 0.5, 0.25))
         if self.normalize:
-            funcs.append(A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)))
+            funcs.append(A.Normalize(
+                mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)))
         transform = A.Compose(funcs)
 
         image = transform(image=image)['image']
@@ -482,7 +497,8 @@ class TransformedSceneTextDataset(Dataset):
         for word_info in self.anno['images'][image_fname]['words'].values():
             vertices.append(np.array(word_info['points']))
             labels.append(int(not word_info['illegibility']))
-        vertices, labels = np.array(vertices, dtype=np.float32), np.array(labels, dtype=np.int64)
+        vertices, labels = np.array(
+            vertices, dtype=np.float32), np.array(labels, dtype=np.int64)
 
         image = imread(image_fpath, pilmode='RGB')
         if self.transform != None:
@@ -520,8 +536,9 @@ class PolygonDatasetExceptCrop(Dataset):
         color_jitter (bool): color_jitter 적용 유무
         normalize (bool): normalize 적용 유무
     '''
+
     def __init__(self, root_dir, split='train', image_size=1024, target_size=1024, color_jitter=True,
-                 normalize=True, use_poly = True):
+                 normalize=True, use_poly=True):
 
         self.annos = []
         self.image_dir = []
@@ -546,27 +563,35 @@ class PolygonDatasetExceptCrop(Dataset):
         vertices, labels = [], []
         for i, anno in enumerate(self.annos):
             if image_fname in anno['images'].keys():
-                image_fpath = osp.join(self.image_dir[i],image_fname)
+                image_fpath = osp.join(self.image_dir[i], image_fname)
                 for word_info in anno['images'][image_fname]['words'].values():
                     if self.use_poly:
                         tmp = split_polygon_to_quadril(word_info)
                         vertices.extend(tmp)
-                        labels.extend([int(not word_info['illegibility'])] * len(tmp))
+                        labels.extend(
+                            [int(not word_info['illegibility'])] * len(tmp))
 
                     else:
-                        flattened_vertices = np.array(word_info['points']).flatten()
+                        flattened_vertices = np.array(
+                            word_info['points']).flatten()
                         if len(flattened_vertices) > 8:
-                            flattened_vertices = transform_to_quad(flattened_vertices)
+                            flattened_vertices = transform_to_quad(
+                                flattened_vertices)
                         elif len(flattened_vertices) < 8:
                             # annotation information이 완전하지 않을 경우 버린다.
                             continue
-                        vertices.append(flattened_vertices) # flatten을 해주면 4,2 -> 4*2
-                        labels.append(int(not word_info['illegibility'])) # 유의하면 1 아니면 0
-                vertices, labels = np.array(vertices, dtype=np.float32), np.array(labels, dtype=np.int64)
-                vertices, labels = filter_vertices(vertices, labels, ignore_under=10, drop_under=1)
+                        # flatten을 해주면 4,2 -> 4*2
+                        vertices.append(flattened_vertices)
+                        # 유의하면 1 아니면 0
+                        labels.append(int(not word_info['illegibility']))
+                vertices, labels = np.array(
+                    vertices, dtype=np.float32), np.array(labels, dtype=np.int64)
+                vertices, labels = filter_vertices(
+                    vertices, labels, ignore_under=10, drop_under=1)
 
         image = Image.open(image_fpath)
-        image = ImageOps.exif_transpose(image) # If the image rotates automatically, it changes it to its original state.
+        # If the image rotates automatically, it changes it to its original state.
+        image = ImageOps.exif_transpose(image)
         image, vertices = resize_img(image, vertices, self.image_size)
         image, vertices = adjust_height(image, vertices)
         image, vertices = rotate_img(image, vertices)
@@ -580,7 +605,8 @@ class PolygonDatasetExceptCrop(Dataset):
         if self.color_jitter:
             funcs.append(A.ColorJitter(0.5, 0.5, 0.5, 0.25))
         if self.normalize:
-            funcs.append(A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)))
+            funcs.append(A.Normalize(
+                mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)))
         transform = A.Compose(funcs)
 
         image = transform(image=image)['image']
