@@ -522,12 +522,17 @@ class PolygonDatasetExceptCrop(Dataset):
     '''
     def __init__(self, root_dir, split='train', image_size=1024, target_size=1024, color_jitter=True,
                  normalize=True, use_poly = True):
-        with open(osp.join(root_dir, 'ufo/{}.json'.format(split)), 'r') as f:
-            anno = json.load(f)
 
-        self.anno = anno
-        self.image_fnames = sorted(anno['images'].keys())
-        self.image_dir = root_dir+"/images"
+        self.annos = []
+        self.image_dir = []
+        for dir in root_dir:
+            self.image_dir.append(osp.join(dir, 'images'))
+            with open(osp.join(dir, 'ufo/{}.json'.format(split)), 'r') as f:
+                self.annos.append(json.load(f))
+        self.image_fnames = []
+        # 받아온 이미지 리스트를 여기서 1개로 합쳐줍니다.
+        for anno in self.annos:
+            self.image_fnames.extend(sorted(anno['images'].keys()))
         self.use_poly = use_poly
 
         self.image_size, self.target_size = image_size, target_size
@@ -538,29 +543,27 @@ class PolygonDatasetExceptCrop(Dataset):
 
     def __getitem__(self, idx):
         image_fname = self.image_fnames[idx]
-        image_fpath = osp.join(self.image_dir, image_fname)
-
         vertices, labels = [], []
+        for i, anno in enumerate(self.annos):
+            if image_fname in anno['images'].keys():
+                image_fpath = osp.join(self.image_dir[i],image_fname)
+                for word_info in anno['images'][image_fname]['words'].values():
+                    if self.use_poly:
+                        tmp = split_polygon_to_quadril(word_info)
+                        vertices.extend(tmp)
+                        labels.extend([int(not word_info['illegibility'])] * len(tmp))
 
-        for word_info in self.anno['images'][image_fname]['words'].values():
-            if self.use_poly:
-                tmp = split_polygon_to_quadril(word_info)
-                vertices.extend(tmp)
-                labels.extend([int(not word_info['illegibility'])] * len(tmp))
-
-            else:
-                flattened_vertices = np.array(word_info['points']).flatten()
-                if len(flattened_vertices) > 8:
-                    flattened_vertices = transform_to_quad(flattened_vertices)
-                elif len(flattened_vertices) < 8:
-                    # annotation information이 완전하지 않을 경우 버린다.
-                    continue
-                vertices.append(flattened_vertices) # flatten을 해주면 4,2 -> 4*2
-                labels.append(int(not word_info['illegibility'])) # 유의하면 1 아니면 0
-
-        vertices, labels = np.array(vertices, dtype=np.float32), np.array(labels, dtype=np.int64)
-
-        vertices, labels = filter_vertices(vertices, labels, ignore_under=10, drop_under=1)
+                    else:
+                        flattened_vertices = np.array(word_info['points']).flatten()
+                        if len(flattened_vertices) > 8:
+                            flattened_vertices = transform_to_quad(flattened_vertices)
+                        elif len(flattened_vertices) < 8:
+                            # annotation information이 완전하지 않을 경우 버린다.
+                            continue
+                        vertices.append(flattened_vertices) # flatten을 해주면 4,2 -> 4*2
+                        labels.append(int(not word_info['illegibility'])) # 유의하면 1 아니면 0
+                vertices, labels = np.array(vertices, dtype=np.float32), np.array(labels, dtype=np.int64)
+                vertices, labels = filter_vertices(vertices, labels, ignore_under=10, drop_under=1)
 
         image = Image.open(image_fpath)
         image = ImageOps.exif_transpose(image) # If the image rotates automatically, it changes it to its original state.

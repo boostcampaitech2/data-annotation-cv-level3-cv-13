@@ -24,6 +24,7 @@ from deteval import *
 import json
 
 import wandb
+from glob import glob
 
 
 def fix_seed(random_seed=0):
@@ -54,7 +55,7 @@ def parse_args():
     # Conventional args
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--data_dir', type=str,
-                        default=os.environ.get('SM_CHANNEL_TRAIN', '../input/data/ICDAR17_Korean'))
+                        default=os.environ.get('SM_CHANNEL_TRAIN', '../input/data/'))
     parser.add_argument('--json_dir', type=str,
                         default='ufo/train.json')
     parser.add_argument('--valid_json_dir', type=str,
@@ -178,6 +179,7 @@ def do_training(seed,data_dir, json_dir, model_dir, dataset_type, device, image_
 
     # import dataset from dataset.py and build a loader
     dataset_module = getattr(import_module("dataset"), dataset_type)
+    data_dir = glob(osp.join(data_dir,'*'))
     dataset = dataset_module(data_dir, split='train', image_size=image_size, target_size=input_size, use_poly=use_poly)
     dataset = EASTDataset(dataset) 
     num_batches = math.ceil(len(dataset) / batch_size)
