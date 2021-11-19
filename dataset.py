@@ -446,8 +446,7 @@ class SceneTextDataset(Dataset):
                         labels.append(int(not word_info['illegibility'])) # 유의하면 1 아니면 0
                 vertices, labels = np.array(vertices, dtype=np.float32), np.array(labels, dtype=np.int64)
                 vertices, labels = filter_vertices(vertices, labels, ignore_under=10, drop_under=1)
-        # 이 부분에서 무조건 inhomogeneous shape error가 날 수밖에 없음. 애초에 np array는 이걸 안받아.
-
+       
         image = Image.open(image_fpath)
         # If the image rotates automatically, it changes it to its original state.
         image = ImageOps.exif_transpose(image)
