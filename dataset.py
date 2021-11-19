@@ -405,13 +405,18 @@ def set_target_size(img, vertices, size):
 class SceneTextDataset(Dataset):
     def __init__(self, root_dir, split='train', image_size=1024, target_size=512, color_jitter=True,
                  normalize=True, use_poly=True):
-        with open(osp.join(root_dir, 'ufo/{}.json'.format(split)), 'r') as f:
-            anno = json.load(f)
-
-        self.anno = anno
-        self.image_fnames = sorted(anno['images'].keys())
-        self.image_dir = osp.join(root_dir, 'images')
+        self.annos = []
+        self.image_dir = []
+        for dir in root_dir:
+            self.image_dir.append(osp.join(dir, 'images'))
+            with open(osp.join(dir, 'ufo/{}.json'.format(split)), 'r') as f:
+                self.annos.append(json.load(f))
+        self.image_fnames = []
+        # 받아온 이미지 리스트를 여기서 1개로 합쳐줍니다.
+        for anno in self.annos:
+            self.image_fnames.extend(sorted(anno['images'].keys()))
         self.use_poly = use_poly
+
         self.image_size, self.crop_size = image_size, target_size
         self.color_jitter, self.normalize = color_jitter, normalize
 
@@ -420,32 +425,28 @@ class SceneTextDataset(Dataset):
 
     def __getitem__(self, idx):
         image_fname = self.image_fnames[idx]
-        image_fpath = osp.join(self.image_dir, image_fname)
-
         vertices, labels = [], []
+        for i, anno in enumerate(self.annos):
+            if image_fname in anno['images'].keys():
+                image_fpath = osp.join(self.image_dir[i],image_fname)
+                for word_info in anno['images'][image_fname]['words'].values():
+                    if self.use_poly:
+                        tmp = split_polygon_to_quadril(word_info)
+                        vertices.extend(tmp)
+                        labels.extend([int(not word_info['illegibility'])] * len(tmp))
 
-        for word_info in self.anno['images'][image_fname]['words'].values():
-            if self.use_poly:
-                tmp = split_polygon_to_quadril(word_info)
-                vertices.extend(tmp)
-                labels.extend([int(not word_info['illegibility'])] * len(tmp))
-
-            else:
-                flattened_vertices = np.array(word_info['points']).flatten()
-                if len(flattened_vertices) > 8:
-                    flattened_vertices = transform_to_quad(flattened_vertices)
-                elif len(flattened_vertices) < 8:
-                    # annotation information이 완전하지 않을 경우 버린다.
-                    continue
-                vertices.append(flattened_vertices)  # flatten을 해주면 4,2 -> 4*2
-                # 유의하면 1 아니면 0
-                labels.append(int(not word_info['illegibility']))
-
+                    else:
+                        flattened_vertices = np.array(word_info['points']).flatten()
+                        if len(flattened_vertices) > 8:
+                            flattened_vertices = transform_to_quad(flattened_vertices)
+                        elif len(flattened_vertices) < 8:
+                            # annotation information이 완전하지 않을 경우 버린다.
+                            continue
+                        vertices.append(flattened_vertices) # flatten을 해주면 4,2 -> 4*2
+                        labels.append(int(not word_info['illegibility'])) # 유의하면 1 아니면 0
+                vertices, labels = np.array(vertices, dtype=np.float32), np.array(labels, dtype=np.int64)
+                vertices, labels = filter_vertices(vertices, labels, ignore_under=10, drop_under=1)
         # 이 부분에서 무조건 inhomogeneous shape error가 날 수밖에 없음. 애초에 np array는 이걸 안받아.
-        vertices, labels = np.array(
-            vertices, dtype=np.float32), np.array(labels, dtype=np.int64)
-        vertices, labels = filter_vertices(
-            vertices, labels, ignore_under=10, drop_under=1)
 
         image = Image.open(image_fpath)
         # If the image rotates automatically, it changes it to its original state.
@@ -518,7 +519,6 @@ class TransformedSceneTextDataset(Dataset):
 class PolygonDatasetExceptCrop(Dataset):
     '''
     기존 SceneTextDatset에서 crop 대신 resize를 수행합니다.
-
     Args:
         root_dir (str): json파일과 이미지파일의 상위 디렉토리
         split (str): json파일명
@@ -526,7 +526,6 @@ class PolygonDatasetExceptCrop(Dataset):
         target_size (int): 이미지 최종 크기
         color_jitter (bool): color_jitter 적용 유무
         normalize (bool): normalize 적용 유무
-
     Attributes:
         anno (dict): json파일 load 내용
         image_fnames (list): 이미지 파일명 리스트 
@@ -536,9 +535,8 @@ class PolygonDatasetExceptCrop(Dataset):
         color_jitter (bool): color_jitter 적용 유무
         normalize (bool): normalize 적용 유무
     '''
-
     def __init__(self, root_dir, split='train', image_size=1024, target_size=1024, color_jitter=True,
-                 normalize=True, use_poly=True):
+                 normalize=True, use_poly = True):
 
         self.annos = []
         self.image_dir = []
@@ -563,35 +561,27 @@ class PolygonDatasetExceptCrop(Dataset):
         vertices, labels = [], []
         for i, anno in enumerate(self.annos):
             if image_fname in anno['images'].keys():
-                image_fpath = osp.join(self.image_dir[i], image_fname)
+                image_fpath = osp.join(self.image_dir[i],image_fname)
                 for word_info in anno['images'][image_fname]['words'].values():
                     if self.use_poly:
                         tmp = split_polygon_to_quadril(word_info)
                         vertices.extend(tmp)
-                        labels.extend(
-                            [int(not word_info['illegibility'])] * len(tmp))
+                        labels.extend([int(not word_info['illegibility'])] * len(tmp))
 
                     else:
-                        flattened_vertices = np.array(
-                            word_info['points']).flatten()
+                        flattened_vertices = np.array(word_info['points']).flatten()
                         if len(flattened_vertices) > 8:
-                            flattened_vertices = transform_to_quad(
-                                flattened_vertices)
+                            flattened_vertices = transform_to_quad(flattened_vertices)
                         elif len(flattened_vertices) < 8:
                             # annotation information이 완전하지 않을 경우 버린다.
                             continue
-                        # flatten을 해주면 4,2 -> 4*2
-                        vertices.append(flattened_vertices)
-                        # 유의하면 1 아니면 0
-                        labels.append(int(not word_info['illegibility']))
-                vertices, labels = np.array(
-                    vertices, dtype=np.float32), np.array(labels, dtype=np.int64)
-                vertices, labels = filter_vertices(
-                    vertices, labels, ignore_under=10, drop_under=1)
+                        vertices.append(flattened_vertices) # flatten을 해주면 4,2 -> 4*2
+                        labels.append(int(not word_info['illegibility'])) # 유의하면 1 아니면 0
+                vertices, labels = np.array(vertices, dtype=np.float32), np.array(labels, dtype=np.int64)
+                vertices, labels = filter_vertices(vertices, labels, ignore_under=10, drop_under=1)
 
         image = Image.open(image_fpath)
-        # If the image rotates automatically, it changes it to its original state.
-        image = ImageOps.exif_transpose(image)
+        image = ImageOps.exif_transpose(image) # If the image rotates automatically, it changes it to its original state.
         image, vertices = resize_img(image, vertices, self.image_size)
         image, vertices = adjust_height(image, vertices)
         image, vertices = rotate_img(image, vertices)
@@ -605,8 +595,7 @@ class PolygonDatasetExceptCrop(Dataset):
         if self.color_jitter:
             funcs.append(A.ColorJitter(0.5, 0.5, 0.5, 0.25))
         if self.normalize:
-            funcs.append(A.Normalize(
-                mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)))
+            funcs.append(A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)))
         transform = A.Compose(funcs)
 
         image = transform(image=image)['image']
