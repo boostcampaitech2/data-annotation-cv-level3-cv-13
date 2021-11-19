@@ -55,7 +55,7 @@ def parse_args():
     # Conventional args
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--data_dir', type=str,
-                        default=os.environ.get('SM_CHANNEL_TRAIN', '../input/data/'))
+                        default=os.environ.get('SM_CHANNEL_TRAIN', '../input/data'))
     parser.add_argument('--json_dir', type=str,
                         default='ufo/train.json')
     parser.add_argument('--valid_json_dir', type=str,
